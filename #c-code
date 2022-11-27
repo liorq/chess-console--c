@@ -1,0 +1,865 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Chess
+{
+    public class ChessGameLauncher
+    {
+        public static void Main()
+        {
+            new ChessGame().playGame();
+        }
+    }
+    class UtilityMethod
+    {
+        public static string ChangeLetterToNumber()
+        {
+            bool isValidInput = true;
+            int Lettercount = 0, Numbercount = 0;
+            string input = "", changedInput = "";
+            do
+            {
+                changedInput = ""; Numbercount = 0;
+                Lettercount = 0; int start = 0;
+                Console.WriteLine("enter move,or enter draw");
+                input = Console.ReadLine();
+                input = input.ToUpper();
+                isValidInput = true;
+                input = input.Trim(' ');
+                if (input.Length == 0)
+                    Console.WriteLine("You only enter space, please try again");
+                while (input == "DRAW")
+                {
+                    Console.WriteLine("are you agreed ? please enter yes or no");
+                    string input1 = Console.ReadLine();
+                    input1 = input1.ToUpper();
+                    input1 = input1.Trim(' ');
+                    if (input1 == "YES" || input1 == "AGREED")
+                    {
+                        Console.WriteLine("Your opponent has agreed to your draw request ");
+                        isValidInput = false; return input;
+                    }
+                    else if (input1 == "NO")
+                        input = "/";
+                    else
+                        Console.WriteLine("please enter your choice again");
+                }
+                for (; start < input.Length && isValidInput; start++)
+                {
+                    switch (input[start])
+                    {
+                        case 'A': changedInput += 1; Lettercount++; break;
+                        case 'B': changedInput += 2; Lettercount++; break;
+                        case 'C': changedInput += 3; Lettercount++; break;
+                        case 'D': changedInput += 4; Lettercount++; break;
+                        case 'E': changedInput += 5; Lettercount++; break;
+                        case 'F': changedInput += 6; Lettercount++; break;
+                        case 'G': Lettercount++; changedInput += 7; break;
+                        case 'H': Lettercount++; changedInput += 8; break;
+                        case '1':case '2':case '3': case '4':case '5':case '6':case '8':case '7':
+                            Numbercount++; changedInput += input[start];
+                            if ((Numbercount == 2 && Lettercount == 0) || (Numbercount == 0 && Lettercount == 2) || (Numbercount == 2 && Lettercount == 1))
+                            {
+                                isValidInput = false;
+                                Console.WriteLine("inValid Input try again");
+                            }
+                            break;
+                        case '/': Console.WriteLine("Your opponent hasn't agreed to your draw request"); goto default;
+                        default: isValidInput = false; break;
+                    }
+                }
+            } while (!isValidInput || Lettercount != 2 || Numbercount != 2);
+            return changedInput;
+        }
+    }
+    class ChessGame
+    {
+        Piece[,] board;
+        int FiftyMoveRuleCount;
+        int numberOfTurns;
+        int currentColumn;
+        int currentRow;
+        int newColumn;
+        int newRow;
+        Rook[] rooks;
+        Pawn[] pawns;
+        King[] kings;
+        string[] boardsHistory;
+        bool checkForW;
+        bool checkForB;
+        public void playGame()
+        {
+            printBoard();
+            bool isCurrentTurnBlack = false, gameover = false;
+            while (!gameover)
+            {
+                bool isLegalMove = false, isFreeSlot = false, isMyPiece = false;
+                while (!gameover && (!isLegalMove || !isFreeSlot || !isMyPiece))
+                {
+                    if (!gameover)
+                    {
+                        string input = UtilityMethod.ChangeLetterToNumber();
+                        if (input == "DRAW")
+                        {
+                            gameover = true; break;
+                        }
+                        ConvertStringToNumbers(input);
+                        string messege = "";
+                        isLegalMove = isLegalMoves(currentColumn, currentRow, newColumn, newRow);
+                        if (isLegalMove)
+                        {
+                            isFreeSlot = IsThisSlotFree(isCurrentTurnBlack);
+                            if (isFreeSlot)
+                            {
+                                isMyPiece = isMyTurn(isCurrentTurnBlack);
+                                messege += !isMyPiece ? "this is not your player try again" : "";
+                            }
+                        }
+                        messege += isLegalMove ? "" : "Illegal step ";
+                        Console.WriteLine(messege);
+                        if (isLegalMove && isFreeSlot && isMyPiece)
+                        {
+                            UpdatePiecesStatus(isCurrentTurnBlack);
+                            if ((!isCurrentTurnBlack && checkForW) || (isCurrentTurnBlack && checkForB))
+                            {
+                                isLegalMove = false; isFreeSlot = false; isMyPiece = false;
+                            }
+                            if (checkForB || checkForW)
+                                Console.WriteLine("check");
+                        }
+                    }
+                }
+                if (gameover)
+                    break;
+                gameover = isDraw();
+                bool check = IsCheck(isCurrentTurnBlack);
+                if (check)
+                    gameover = gameover || IsMate(isCurrentTurnBlack);
+
+                check = IsCheck(!isCurrentTurnBlack);
+                if (check)
+                    gameover = gameover || IsMate(!isCurrentTurnBlack);
+
+                updateNumberOfTurns();
+                isCurrentTurnBlack = !isCurrentTurnBlack;
+                printBoard();
+                if (gameover)
+                {
+                    Console.WriteLine("GAME-OVER");
+                    gameover = true; break;
+                }
+            }
+        }
+        public void ConvertStringToNumbers(string input)
+        {
+            currentColumn = int.Parse("" + input[0]) - 1;
+            currentRow = int.Parse("" + input[1]) - 1;
+            newColumn = int.Parse("" + input[2]) - 1;
+            newRow = int.Parse("" + input[3]) - 1;
+        }
+        public int getNumberOfTurns()
+        { return numberOfTurns; }
+        public void updateNumberOfTurns()
+        { numberOfTurns++; }
+        public bool isLegalMoves(int currentColumn, int currentRow, int newColumn, int newRow)
+        {
+            if (board[currentRow, currentColumn] == null)
+                return false;
+
+            bool isLegalMove = ((board[currentRow, currentColumn]).islegalMoves(currentRow, currentColumn, newRow, newColumn, board, this)) ? true : false;
+            if (isLegalMove)
+                return true;
+
+            return false;
+        }
+        public bool IsThisSlotFree(bool isCurrentTurnBlack)
+        {
+            if (board[newRow, newColumn] == null || isCurrentTurnBlack != board[newRow, newColumn].getIsBlack())
+                return true;
+            return false;
+        }
+        ///  This function changes the position of the players and clears the previous position
+        public void makeMove(int currentColumn, int currentRow, int newColumn, int newRow, Piece temporaryPiece)
+        {
+            board[newRow, newColumn] = board[currentRow, currentColumn];
+            board[currentRow, currentColumn] = null;
+        }
+        public void reverseMove(int currentColumn, int currentRow, int newColumn, int newRow, Piece temporaryPiece)
+        {
+            board[currentRow, currentColumn] = board[newRow, newColumn];
+            board[newRow, newColumn] = temporaryPiece;
+        }
+        public bool UpdatePiecesStatus(bool isCurrentTurnBlack)
+        {
+            Piece temporaryPiece = board[newRow, newColumn];
+            makeMove(currentColumn, currentRow, newColumn, newRow, temporaryPiece);
+            //update kings Locations 
+            int position = isCurrentTurnBlack ? 1 : 0;
+            if (board[newRow, newColumn] is King)
+                kings[position].setPosition(newRow, newColumn);
+
+            isPromotion(isCurrentTurnBlack);
+            checkForB = IsCheck(true);
+            checkForW = IsCheck(false);
+            ///in case the player does move that threating on his king the move will be cancelled
+            if ((checkForB && getNumberOfTurns() % 2 == 1) || (checkForW && getNumberOfTurns() % 2 == 0))
+            {
+                if (board[newRow, newColumn] is King)
+                    kings[position].setPosition(currentRow, currentColumn);
+
+                reverseMove(currentColumn, currentRow, newColumn, newRow, temporaryPiece);
+                Console.WriteLine("your move threating on your king ,try again");
+                return false;
+            }
+            if (board[newRow, newColumn] is Pawn)
+            {
+                if (((Pawn)board[newRow, newColumn]).getNeverMoved() && currentRow - newRow == -2 || currentRow - newRow == 2)
+                    ((Pawn)board[newRow, newColumn]).setTurnThatjumpTwice(getNumberOfTurns());
+                //enPassnt case
+                if (temporaryPiece == null)
+                {
+                    int direction = newColumn - currentColumn == -1 ? -1 : 1;
+                    if (newColumn - currentColumn == +direction && board[currentRow, currentColumn + direction] != null)
+                        board[currentRow, currentColumn + direction] = null;
+                }
+            }
+            board[newRow, newColumn].updateNeverMoved();
+            if (board[newRow, newColumn] is Pawn || temporaryPiece != null)
+                FiftyMoveRuleCount = 0;
+
+            return true;
+        }
+        public bool isDraw()
+        {
+            bool draw = isfiftyMoveRule() || isThreeFoldRepetition() || isDeadPosition() || isStalemate(true) || isStalemate(false);
+            if (draw)
+                return true;
+            return false;
+        }
+        /// This function checks if there are 50 turns without any killing or moving pawns
+        public bool isfiftyMoveRule()
+        {
+            FiftyMoveRuleCount++;
+            if (FiftyMoveRuleCount == 50)
+            {
+                Console.WriteLine("Fifty Move Rule");
+                return true;
+            }
+            return false;
+        }
+        /// This function checks if the position of the boardPieces is repeated 3 times
+        public bool isThreeFoldRepetition()
+        {
+            string temporary = "";
+            for (int row = 7, y = 8, i = 0; row != -1; row--, y--)
+            {
+                for (int column = 0; column < 8; column++, i++)
+                {
+                    if (board[row, column] == null)
+                    {
+                        temporary += " "; continue;
+                    }
+                    temporary += board[row, column].ToString();
+                    if (i < 8)
+                        temporary += "" + pawns[column].getNeverMoved() + pawns[column + 8].getNeverMoved();
+                    if (i < 4)
+                        temporary += rooks[i].getNeverMoved();
+                    if (i < 2)
+                        temporary += "" + kings[i].getNeverMoved();
+                }
+            }
+            boardsHistory[getNumberOfTurns()] = temporary;
+
+            for (int i = 0, counter = 0; i < getNumberOfTurns() + 1; i++)
+            {
+                if (boardsHistory[i] == temporary)
+                    counter++;
+                if (counter == 3)
+                {
+                    Console.WriteLine("Three Fold Repetition");
+                    return true;
+                }
+            }
+            return false;
+        }
+        public bool isStalemate(bool isBlack)
+        {
+            bool check = IsCheck(isBlack);
+            bool Stalemate = IsMate(isBlack);
+            if (Stalemate && !check)
+            {
+                Console.WriteLine("Stalemate");
+                return true;
+            }
+            return false;
+        }
+        public ChessGame()
+        {
+            rooks = new Rook[4];
+            pawns = new Pawn[16];
+            kings = new King[2];
+            boardsHistory = new string[150];
+            board = new Piece[8, 8];
+            for (int col = 0; col < 8; col++)
+            {
+                board[1, col] = new Pawn(false);
+                board[6, col] = new Pawn(true);
+                pawns[col] = (Pawn)board[1, col];
+                pawns[col + 8] = (Pawn)board[6, col];
+            }
+            board[0, 0] = new Rook(false, true);
+            board[0, 7] = new Rook(false, true);
+            board[7, 0] = new Rook(true, true);
+            board[7, 7] = new Rook(true, true);
+            board[0, 1] = new Knight(false);
+            board[0, 6] = new Knight(false);
+            board[7, 1] = new Knight(true);
+            board[7, 6] = new Knight(true);
+            board[0, 2] = new Bishoph(false);
+            board[0, 5] = new Bishoph(false);
+            board[7, 2] = new Bishoph(true);
+            board[7, 5] = new Bishoph(true);
+            board[0, 3] = new Queen(false);
+            board[7, 3] = new Queen(true);
+            board[0, 4] = new King(0, 4, true, false, kings);
+            board[7, 4] = new King(7, 4, true, true, kings);
+            rooks[0] = (Rook)board[0, 0];
+            rooks[1] = (Rook)board[0, 7];
+            rooks[2] = (Rook)board[7, 0];
+            rooks[3] = (Rook)board[7, 7];
+            kings[0] = (King)board[0, 4];
+            kings[1] = (King)board[7, 4];
+        }
+        public void printBoard()
+        {
+            Console.WriteLine(" " + "| A" + "| B" + "| C" + "| D" + "| E" + "| F" + "| G" + "| H|");
+            for (int row = 7, y = 8; row != -1; row--, y--)
+            {
+                Console.Write(y + "|");
+                for (int column = 0; column < 8; column++)
+                {
+                    Console.Write(board[row, column]);
+                    if (board[row, column] == null)
+                        Console.Write("  ");
+
+                    Console.Write("|");
+                }
+                Console.WriteLine();
+            }
+        }
+        ///This function checks if there is PAWNS, that reached the end of the board,and need to pass Promotion.
+        public bool isPromotion(bool isCurrentTurnBlack)
+        {
+            bool isValidInput = true;
+            for (int column = 0; column < 8 && isValidInput; column++)
+            {
+                if (board[0, column] != null && board[0, column] is Pawn || board[7, column] != null && board[7, column] is Pawn)
+                {
+                    int Side = !isCurrentTurnBlack ? 7 : 0;
+                    while (isValidInput)
+                    {
+                        Console.WriteLine("Type the character you want to promot the pawn to, prees 1 for rook /2 for bishop /or 3 for queen");
+                        string input = Console.ReadLine();
+                        switch (input.ToUpper())
+                        {
+                            case "1": board[Side, column] = new Rook(isCurrentTurnBlack, false); isValidInput = false; break;
+                            case "2": board[Side, column] = new Bishoph(isCurrentTurnBlack); isValidInput = false; break;
+                            case "3": board[Side, column] = new Queen(isCurrentTurnBlack); isValidInput = false; break;
+                        }
+                    }
+                }
+            }
+            if (!isValidInput)
+                return true;
+            return false;
+        }
+        ///This function checks if there dead position cases.
+        public bool isDeadPosition()
+        {
+            int Kings = 0, Knights = 0, Bishops = 0, AllPieces = 0;
+            for (int row = 7, y = 8; row != -1; row--, y--)
+                for (int column = 0; column < 8; column++)
+                    if (board[row, column] != null)
+                    {
+                        if (board[row, column] is Bishoph)
+                            Bishops++; AllPieces++;
+                        if (board[row, column] is King)
+                            Kings++; AllPieces++;
+                        if (board[row, column] is Knight)
+                            Knights++; AllPieces++;
+                    }
+            if ((Kings == 2 && AllPieces == 3 && Bishops == 1) || (Kings == 2 && AllPieces == 3 && Knights == 1) || (Kings == 2 && AllPieces == 2))
+            {
+                Console.WriteLine("dead position");
+                return true;
+            }
+            return false;
+        }
+        public bool isMyTurn(bool isCurrentTurnBlack)
+        {
+            if (isCurrentTurnBlack == board[currentRow, currentColumn].getIsBlack())
+                return true;
+
+            return false;
+        }
+        public bool IsCheck(bool isCurrentTurnBlack)
+        {
+            int position = isCurrentTurnBlack ? 1 : 0;
+
+            for (int row = 7, y = 8; row != -1; row--, y--)
+                for (int column = 0; column < 8; column++)
+                {
+                    bool check = false;
+                    if (board[row, column] != null && isCurrentTurnBlack != board[row, column].getIsBlack())
+                        check = isLegalMoves(column, row, kings[position].getColumn(), kings[position].getRow());
+
+                    if (check)
+                        return true;
+                }
+            return false;
+        }
+        public bool IsMate(bool isCurrentTurnBlack)
+        {
+            for (int row = 7; row != -1; row--)
+                for (int column = 0; column < 8; column++)
+                    if (board[row, column] != null && isCurrentTurnBlack == board[row, column].getIsBlack())
+                        for (int nextRow = 7; nextRow != -1; nextRow--)
+                            for (int nextColumn = 0; nextColumn < 8; nextColumn++)
+                            {
+                                Piece temporaryPiece = board[nextRow, nextColumn];
+                                if (temporaryPiece == null || isCurrentTurnBlack != temporaryPiece.getIsBlack())
+                                {
+                                    bool LegalMove = isLegalMoves(column, row, nextColumn, nextRow);
+                                    if (LegalMove)
+                                    {
+                                        makeMove(column, row, nextColumn, nextRow, temporaryPiece);
+                                        bool check = IsCheck(isCurrentTurnBlack);
+                                        reverseMove(column, row, nextColumn, nextRow, temporaryPiece);
+                                        if ((board[row, column] is King) || (!check))
+                                            return false;
+                                    }
+                                }
+                            }
+            return true;
+        }
+        public bool isShortCastlingPossible(int currentRow, int currentColumn, int newRow, int newColumn, bool isBlack)
+        {
+            int position = isBlack ? 1 : 0;
+
+            if (!isBlack && !(board[0, 7] != null && rooks[1].getNeverMoved() && kings[0].getNeverMoved() && board[0, 5] == null && board[0, 6] == null))
+                return false;
+            if (isBlack && !(board[7, 7] != null && rooks[3].getNeverMoved() && kings[1].getNeverMoved() && board[7, 5] == null && board[7, 6] == null))
+                return false;
+
+            for (int row = 7, y = 8; row != -1; row--, y--)
+                for (int column = 0; column < 8; column++)
+                    if (board[row, column] != null && isBlack != board[row, column].getIsBlack())
+                        for (int x = 0; x < 3; x++)
+                        {
+                            bool check = isLegalMoves(column, row, (kings[position].getColumn() + x), kings[position].getRow());
+                            if (check)
+                                return false;
+                        }
+            return true;
+        }
+        public bool isLongCastlingPossible(int currentRow, int currentColumn, int newRow, int newColumn, bool isBlack)
+        {
+            int position = isBlack ? 1 : 0;
+
+            if (isBlack && !(rooks[2].getNeverMoved() && kings[1].getNeverMoved() && board[7, 1] == null && board[7, 2] == null && board[7, 3] == null))
+                return false;
+
+            if (!isBlack && !(rooks[0].getNeverMoved() && kings[0].getNeverMoved() && board[0, 3] == null && board[0, 2] == null && board[0, 1] == null))
+                return false;
+
+            for (int row = 7, y = 8; row != -1; row--, y--)
+                for (int column = 0; column < 8; column++)
+                    if (board[row, column] != null && isBlack != board[row, column].getIsBlack())
+                        for (int x = 0; x < 3; x++)
+                        {
+                            bool check = isLegalMoves(column, row, (kings[position].getColumn() - x), kings[position].getRow());
+
+                            if (check)
+                                return false;
+                        }
+            return true;
+        }
+    }
+    class Piece
+    {
+        protected bool isBlack;
+        public Piece(bool isBlack)
+        {
+            this.isBlack = isBlack;
+        }
+        public Piece(int row, int column, bool isBlack, King[] kings)
+        {
+            this.isBlack = isBlack;
+        }
+        public bool getIsBlack()
+        { return isBlack; }
+        public virtual void updateNeverMoved()
+        { }
+        public virtual bool islegalMoves(int currentRow, int currentColumn, int newRow, int newColumn, Piece[,] board, ChessGame game)
+        { return true; }
+    }
+    class King : Piece
+    {
+        bool neverMoved;
+        int row;
+        int column;
+        King[] kings;
+        public override bool islegalMoves(int currentRow, int currentColumn, int newRow, int newColumn, Piece[,] board, ChessGame game)
+        {
+            int position = isBlack ? position = 1 : position = 0;
+
+            if ((newRow == currentRow - 1 && newColumn == currentColumn + 1) || (newRow == currentRow - 1 && newColumn == currentColumn - 1)
+                || (newRow == currentRow + 1 && newColumn == currentColumn + 1) || (newRow == currentRow && newColumn == currentColumn + 1)
+                || (newRow == currentRow && newColumn == currentColumn - 1) || (newRow == currentRow - 1 && newColumn == currentColumn)
+                   || (newRow == currentRow + 1 && newColumn == currentColumn) || (newRow == currentRow + 1 && newColumn == currentColumn - 1))
+            {
+                if (board[newRow, newColumn] != null && board[newRow, newColumn] is King)
+                    return true;
+
+                Piece temporaryPiece = board[newRow, newColumn];
+                kings[position].setPosition(newRow, newColumn);
+                game.makeMove(currentColumn, currentRow, newColumn, newRow, temporaryPiece);
+                bool check = game.IsCheck(isBlack);
+                kings[position].setPosition(currentRow, currentColumn);
+                game.reverseMove(currentColumn, currentRow, newColumn, newRow, temporaryPiece);
+                if (!check)
+                    return true;
+            }
+            bool isCastlingPossible = false;
+            if (isBlack)
+            {
+                // isCastlingPossible-LONG
+                if (currentRow == 7 && currentColumn == 4 && newRow == 7 && newColumn == 2)
+                {
+                    isCastlingPossible = game.isLongCastlingPossible(currentRow, currentColumn, newRow, newColumn, true);
+                    if (isCastlingPossible)
+                    {
+                        board[7, 3] = board[7, 0]; board[7, 0] = null;
+                        return true;
+                    }
+                }
+                // isCastlingPossible-SHORT
+                if (currentRow == 7 && currentColumn == 4 && newRow == 7 && newColumn == 6)
+                {
+                    isCastlingPossible = game.isShortCastlingPossible(currentRow, currentColumn, newRow, newColumn, true);
+                    if (isCastlingPossible)
+                    {
+                        board[7, 5] = board[7, 7]; board[7, 7] = null;
+                        return true;
+                    }
+                }
+            }
+            if (!isBlack)
+            {
+                // isCastlingPossible-LONG
+                if (currentRow == 0 && currentColumn == 4 && newRow == 0 && newColumn == 2)
+                {
+                    isCastlingPossible = game.isLongCastlingPossible(currentRow, currentColumn, newRow, newColumn, false);
+                    if (isCastlingPossible)
+                    {
+                        board[0, 3] = board[0, 0]; board[0, 0] = null;
+                        return true;
+                    }
+                }
+                // isCastlingPossible-SHORT
+                if (currentRow == 0 && currentColumn == 4 && newRow == 0 && newColumn == 6)
+                {
+                    isCastlingPossible = game.isShortCastlingPossible(currentRow, currentColumn, newRow, newColumn, false);
+                    if (isCastlingPossible)
+                    {
+                        board[0, 5] = board[0, 7]; board[0, 7] = null;
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        public override string ToString()
+        { return (isBlack ? "B" : "W") + "K"; }
+        public King(int row, int column, bool neverMoved, bool isBlack, King[] kings) : base(row, column, isBlack, kings)
+        {
+            this.kings = kings;
+            this.row = row;
+            this.column = column;
+            this.neverMoved = true;
+        }
+        public override void updateNeverMoved()
+        { neverMoved = false; }
+        public bool getNeverMoved()
+        { return neverMoved; }
+        public void setRow(int row)
+        { this.row = row; }
+        public void setColumn(int column)
+        { this.column = column; }
+        public void setPosition(int row, int column)
+        {
+            setRow(row);
+            setColumn(column);
+        }
+        public int getRow()
+        { return row; }
+        public int getColumn()
+        { return column; }
+    }
+    class Pawn : Piece
+    {
+        bool neverMoved;
+        int TurnThatjumpTwice;
+        public override bool islegalMoves(int currentRow, int currentColumn, int newRow, int newColumn, Piece[,] board, ChessGame game)
+        {
+            if (!isBlack && currentRow - newRow == -1 && board[newRow, newColumn] == null)
+            {
+                ///White en passnt right side
+                if (currentColumn < 7 && board[currentRow, currentColumn + 1] != null && currentColumn - newColumn == -1)
+                    if (board[currentRow, currentColumn + 1] is Pawn && (((Pawn)board[currentRow, currentColumn + 1]).getTurnThatjumpTwice() == game.getNumberOfTurns() - 1))
+                        if (isValidEnPassnt(currentRow, currentColumn, newRow, newColumn, game, board, false, true))
+                            return true;
+                ///White en passnt left side
+                if (currentColumn > 0 && board[currentRow, currentColumn - 1] != null && currentColumn - newColumn == 1)
+                    if (board[currentRow, currentColumn - 1] is Pawn && (((Pawn)board[currentRow, currentColumn - 1]).getTurnThatjumpTwice() == game.getNumberOfTurns() - 1))
+                        if (isValidEnPassnt(currentRow, currentColumn, newRow, newColumn, game, board, false, false))
+                            return true;
+            }
+            if (isBlack && currentRow - newRow == 1 && board[newRow, newColumn] == null)
+            {
+                ///Black en passnt left side
+                if (currentColumn < 7 && board[currentRow, currentColumn + 1] != null && currentColumn - newColumn == -1)
+                    if (board[currentRow, currentColumn + 1] is Pawn && (((Pawn)board[currentRow, currentColumn + 1]).getTurnThatjumpTwice() == game.getNumberOfTurns() - 1))
+                        if (isValidEnPassnt(currentRow, currentColumn, newRow, newColumn, game, board, true, false))
+                            return true;
+                //Black en passnt  right side
+                if (currentColumn > 0 && board[currentRow, currentColumn - 1] != null && currentColumn - newColumn == 1)
+                    if ((board[currentRow, currentColumn - 1] is Pawn) && (((Pawn)board[currentRow, currentColumn - 1]).getTurnThatjumpTwice() == game.getNumberOfTurns() - 1))
+                        if (isValidEnPassnt(currentRow, currentColumn, newRow, newColumn, game, board, true, true))
+                            return true;
+            }
+            if (board[newRow, newColumn] != null && board[newRow, newColumn].getIsBlack() != board[currentRow, currentColumn].getIsBlack())
+            {
+                if (isBlack && ((currentColumn - newColumn == 1 && currentRow - newRow == 1) || (currentColumn - newColumn == -1 && currentRow - newRow == 1)))
+                    return true;
+
+                if (!isBlack && ((currentColumn - newColumn == -1 && currentRow - newRow == -1) || (currentColumn - newColumn == +1 && currentRow - newRow == -1)))
+                    return true;
+            }
+            //2 steps and 1 step
+            int firstDirction = !isBlack ? -1 : 1;
+            int secondDirction = !isBlack ? -2 : 2;
+
+            if (neverMoved && currentRow - newRow == secondDirction && currentColumn == newColumn && board[newRow, newColumn] == null && board[newRow + firstDirction, newColumn] == null)
+                return true;
+
+            if (currentColumn == newColumn && currentRow - newRow == firstDirction && board[newRow, newColumn] == null)
+                return true;
+
+            return false;
+        }
+        public bool isValidEnPassnt(int currentRow, int currentColumn, int newRow, int newColumn, ChessGame game, Piece[,] board, bool isBlack, bool isRightSide)
+        {
+            // Checks that enPassant move doesn't threaten on his own king
+            int Dirction = (isBlack && !isRightSide) || (!isBlack && isRightSide) ? 1 : -1;
+            Piece temporaryPiece = board[currentRow, currentColumn + Dirction];
+            board[currentRow, currentColumn + Dirction] = null;
+            game.makeMove(currentColumn, currentRow, newColumn, newRow, null);
+
+            bool check = game.IsCheck(isBlack);
+            board[currentRow, currentColumn + Dirction] = temporaryPiece;
+            game.reverseMove(currentColumn, currentRow, newColumn, newRow, null);
+            if (check)
+                return false;
+
+            return true;
+        }
+        public override string ToString()
+        { return (isBlack ? "B" : "W") + "P"; }
+        public Pawn(bool isBlack) : base(isBlack)
+        { neverMoved = true; }
+        public void setTurnThatjumpTwice(int TurnThatjumpTwice)
+        { this.TurnThatjumpTwice = TurnThatjumpTwice; }
+
+        public int getTurnThatjumpTwice()
+        { return TurnThatjumpTwice; }
+
+        public override void updateNeverMoved()
+        { neverMoved = false; }
+
+        public bool getNeverMoved()
+        { return neverMoved; }
+    }
+    class Rook : Piece
+    {
+        bool neverMoved;
+        public override bool islegalMoves(int currentRow, int currentColumn, int newRow, int newColumn, Piece[,] board, ChessGame game)
+        {
+            if (((newRow == currentRow + 1) && (newColumn == currentColumn)) || ((newRow == currentRow - 1) && (newColumn == currentColumn))
+                 || (newRow == currentRow) && (newColumn == currentColumn - 1) || (newRow == currentRow) && (newColumn == currentColumn + 1))
+                return true;
+            for (int i = 0; i < 9; i++)
+            {
+                ///up
+                if ((newRow == currentRow + i) && (newColumn == currentColumn))
+                {
+                    for (int j = newRow - 1, BlackSquareCount = 0; j > currentRow; j--)
+                    {
+                        if (board[j, currentColumn] == null)
+                            BlackSquareCount++;
+
+                        if (BlackSquareCount == newRow - currentRow - 1)
+                            return true;
+                    }
+                }
+                ///down
+                else if ((newRow == currentRow - i) && (newColumn == currentColumn))
+                {
+                    for (int j = currentRow - 1, BlackSquareCount = 0; j > newRow; j--)
+                    {
+                        if (board[j, currentColumn] == null)
+                            BlackSquareCount++;
+
+                        if (BlackSquareCount == currentRow - newRow - 1)
+                            return true;
+                    }
+                }
+                //Left side
+                else if ((newRow == currentRow) && (newColumn == currentColumn - i))
+                {
+                    for (int j = currentColumn - 1, BlackSquareCount = 0; j > newColumn; j--)
+                    {
+                        if (board[currentRow, j] == null)
+                            BlackSquareCount++;
+
+                        if (BlackSquareCount == currentColumn - newColumn - 1)
+                            return true;
+                    }
+                }
+                //right side
+                else if ((newRow == currentRow) && (newColumn == currentColumn + i))
+                {
+                    for (int j = newColumn - 1, BlackSquareCount = 0; j > currentColumn; j--)
+                    {
+                        if (board[currentRow, j] == null)
+                            BlackSquareCount++;
+
+                        if (BlackSquareCount == newColumn - currentColumn - 1)
+                            return true;
+                    }
+                }
+            }
+            return false;
+        }
+        public override string ToString()
+        {
+            return (isBlack ? "B" : "W") + "R";
+        }
+        public Rook(bool isBlack, bool neverMoved) : base(isBlack)
+        {
+            this.neverMoved = true;
+        }
+        public override void updateNeverMoved()
+        { neverMoved = false; }
+        public bool getNeverMoved()
+        { return neverMoved; }
+    }
+    class Bishoph : Piece
+    {
+        public override bool islegalMoves(int currentRow, int currentColumn, int newRow, int newColumn, Piece[,] board, ChessGame game)
+        {
+            for (int i = 0; i < 9; i++)
+            {
+                //Top right diagonal
+                if ((newRow == currentRow + i) && (newColumn == currentColumn + i))
+                {
+                    for (int j = newColumn - 1, x = newRow - 1, BlackSquareCount = 0; j >= currentColumn; j--, x--)
+                    {
+                        if (board[x, j] == null)
+                            BlackSquareCount++;
+                        if (BlackSquareCount == newColumn - currentColumn - 1)
+                            return true;
+                    }
+                }
+                // top left diagonal
+                else if ((newRow == currentRow + i) && (newColumn == currentColumn - i))
+                {
+                    for (int j = newColumn + 1, x = newRow - 1, BlackSquareCount = 0; j <= currentColumn; j++, x--)
+                    {
+                        if (board[x, j] == null)
+                            BlackSquareCount++;
+                        if (BlackSquareCount == currentColumn - newColumn - 1)
+                            return true;
+                    }
+                }
+                // Down right diagonal
+                else if ((newRow == currentRow - i) && (newColumn == currentColumn + i))
+                {
+                    for (int j = newColumn - 1, x = newRow + 1, BlackSquareCount = 0; j >= currentColumn; j--, x++)
+                    {
+                        if (board[x, j] == null)
+                            BlackSquareCount++;
+                        if (BlackSquareCount == newColumn - currentColumn - 1)
+                            return true;
+                    }
+                }
+                //Left diagonal down
+                else if ((newRow == currentRow - i) && (newColumn == currentColumn - i))
+                {
+                    for (int j = newColumn + 1, x = newRow + 1, BlackSquareCount = 0; j <= currentColumn; j++, x++)
+                    {
+                        if (board[x, j] == null)
+                            BlackSquareCount++;
+                        if (BlackSquareCount == currentColumn - newColumn - 1)
+                            return true;
+                    }
+                }
+            }
+            return false;
+        }
+        public Bishoph(bool isBlack) : base(isBlack)
+        { }
+        public override string ToString()
+        { return (isBlack ? "B" : "W") + "B"; }
+    }
+    class Knight : Piece
+    {
+        public override bool islegalMoves(int currentRow, int currentColumn, int newRow, int newColumn, Piece[,] board, ChessGame game)
+        {
+            if ((newRow == currentRow + 2 && newColumn == currentColumn + 1 || (newRow == currentRow + 2 && newColumn == currentColumn - 1)))
+                return true;
+            else if ((newRow == currentRow - 2 && newColumn == currentColumn + 1) || (newRow == currentRow - 2 && newColumn == currentColumn - 1))
+                return true;
+            else if ((newRow == currentRow + 1 && newColumn == currentColumn + 2) || (newRow == currentRow + 1 && newColumn == currentColumn - 2))
+                return true;
+            else if ((newRow == currentRow - 1 && newColumn == currentColumn + 2) || (newRow == currentRow - 1 && newColumn == currentColumn - 2))
+                return true;
+
+            return false;
+        }
+        public Knight(bool isBlack) : base(isBlack)
+        { }
+        public override string ToString()
+        { return (isBlack ? "B" : "W") + "N"; }
+    }
+    class Queen : Piece
+    {
+        public override bool islegalMoves(int currentRow, int currentColumn, int newRow, int newColumn, Piece[,] board, ChessGame game)
+        {
+            Bishoph queenAsBishop = new Bishoph(false);
+            Rook queenAsRook = new Rook(false, false);
+            bool islegalMove = queenAsBishop.islegalMoves(currentRow, currentColumn, newRow, newColumn, board, game) || queenAsRook.islegalMoves(currentRow, currentColumn, newRow, newColumn, board, game);
+            if (islegalMove)
+                return true;
+
+            return false;
+        }
+        public Queen(bool isBlack) : base(isBlack)
+        { }
+        public override string ToString()
+        { return (isBlack ? "B" : "W") + "Q"; }
+    }
+}
